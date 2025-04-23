@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 # ─── Hugging Face model download & load ────────────────────────────────────────
 HF_REPO     = "Abdotageldin/diabetes-pkl"
-HF_FILENAME = "model1_compressed.pkl"
+HF_FILENAME = "model_compressed.pkl"
 
 try:
     # Download (and cache) the .pkl from your HF repo
