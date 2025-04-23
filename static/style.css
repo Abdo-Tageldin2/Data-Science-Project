@@ -1,0 +1,147 @@
+/* static/style.css */
+
+body {
+  background: #121212;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0; padding: 0;
+}
+
+.top-nav {
+  background: #1e1e1e;
+  padding: 0.7rem 1rem;
+  text-align: center;
+}
+.top-nav a {
+  color: #e0e0e0;
+  text-decoration: none;
+  margin: 0 0.6rem;
+  font-weight: bold;
+}
+.top-nav a:hover { color: #1db954; }
+
+.container {
+  /* widened to fit larger Plotly figures */
+  max-width: 1400px;
+  margin: 50px auto;
+  padding: 30px;
+  background: #1e1e1e;
+  border-radius: 10px;
+  box-shadow: 0 0 16px rgba(0,0,0,0.8);
+}
+
+h1, h2 {
+  text-align: center;
+  margin-bottom: 1.2rem;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid #333;
+  margin-bottom: 1.5rem;
+}
+.tab-bar button {
+  flex: 1;
+  padding: 0.8rem;
+  background: #1e1e1e;
+  border: none;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.tab-bar button.active {
+  border-bottom: 3px solid #1db954;
+  color: #1db954;
+}
+
+.plot-container {
+  margin-top: 1.5rem;
+}
+
+.interpret {
+  background: #232323;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1.5rem 0;
+  line-height: 1.5;
+}
+.interpret h3 {
+  margin-top: 0;
+}
+
+.schema-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.schema-table th, .schema-table td {
+  border: 1px solid #333;
+  padding: 0.6rem;
+}
+.schema-table th {
+  background: #2a2a2a;
+}
+
+/* reuse your existing prediction page styles below… */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+label {
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+}
+input, select, output {
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem;
+  background: #2a2a2a;
+  color: #fff;
+}
+.radio-group {
+  display: flex;
+  gap: 0.6rem;
+}
+.radio-group input[type="radio"] { display: none; }
+.radio-group label {
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.radio-group input[type="radio"]:checked + label {
+  background: #1db954;
+  color: #121212;
+}
+input[type="range"] {
+  width: 100%;
+  margin: 0.4rem 0;
+}
+.predict-button {
+  padding: 0.8rem 1.5rem;
+  font-size: 1.1rem;
+  background: #1db954;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #121212;
+  font-weight: bold;
+}
+.predict-button:hover {
+  background: #17a34a;
+}
+.prediction-output {
+  margin-top: 1.8rem;
+  padding: 1rem;
+  background: #252525;
+  border-radius: 6px;
+  text-align: center;
+  color: #00e676;
+  font-size: 1.2rem;
+}

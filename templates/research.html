@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Research &amp; Observations</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+
+  <div class="top-nav">
+    <a href="/">🔮 Predict</a> |
+    <a href="/research">🔬 Research &amp; Observations</a>
+  </div>
+
+  <div class="container">
+    <h1>🔬 Research &amp; Observations</h1>
+
+    <div class="tab-bar">
+      <button class="active" data-tab="q2">Question 2</button>
+      <button data-tab="q3">Question 3</button>
+      <button data-tab="q4">Question 4</button>
+      <button data-tab="q5">Question 5</button>
+    </div>
+
+    <!-- Question 2 -->
+    <div id="q2" class="tab-content">
+      <h2>Question 2</h2>
+      <p><strong>How do lifestyle factors (smoking, heavy alcohol, fruit &amp; veggie intake) impact the likelihood of developing diabetes?</strong></p>
+
+      <p><em>(Plot generated via <code>GET /api/research/q2</code>)</em></p>
+      <div class="plot-container"><div id="q2-graph"></div></div>
+
+      <div class="interpret">
+        <h3>Interpretation of Lifestyle Factors vs Diabetes (Balanced)</h3>
+        <ul>
+          <li><strong>Smoking Status:</strong> Smokers (Yes) have a higher count of diabetes (2273) compared to non‑smokers (2065), suggesting that smoking may increase the likelihood of developing diabetes.</li>
+          <li><strong>Heavy Alcohol Consumption:</strong> Heavy drinkers (Yes) show a much lower count of diabetes (117) compared to non‑heavy drinkers (4221). However, the small sample size of heavy drinkers (total 648) suggests this may not be representative and requires cautious interpretation.</li>
+          <li><strong>Fruit Intake:</strong> Respondents consuming fruits daily (≥1/day) have a lower count of diabetes (2567) compared to those who don’t (<1/day, 1771), indicating that regular fruit intake may have a protective effect against diabetes.</li>
+          <li><strong>Vegetable Intake:</strong> Similarly, those consuming vegetables daily (≥1/day) show a lower count of diabetes (3269) compared to those who don’t (<1/day, 1069), supporting the idea that vegetable intake may reduce diabetes risk.</li>
+        </ul>
+        <p>With balanced classes, these visualizations highlight that smoking is associated with higher diabetes prevalence, while regular fruit and vegetable intake may lower the risk. The effect of heavy alcohol consumption is less clear due to its small sample size.</p>
+      </div>
+    </div>
+
+    <!-- Question 3 -->
+    <div id="q3" class="tab-content" style="display:none;">
+      <h2>Question 3</h2>
+      <p><strong>How do income and education levels affect the prevalence of diabetes?</strong></p>
+
+      <p><em>(Plot generated via <code>GET /api/research/q3</code>)</em></p>
+      <div class="plot-container"><div id="q3-graph"></div></div>
+
+      <div class="interpret">
+        <h3>Interpretation of Socioeconomic Factors vs Diabetes (Balanced)</h3>
+        <ul>
+          <li><strong>Income Levels:</strong> Lower income brackets (&lt;$10k to $20–25k) show a higher proportion of diabetes. For example, the &lt;$10k group has 115 diabetes cases out of 320 respondents (36%), whereas the ≥ $75k group has 1396 cases out of 4226 respondents (33%). This suggests limited resources and access can drive higher diabetes risk.</li>
+          <li><strong>Education Levels:</strong> Lower education categories (None/K to Grades 9–11) exhibit dramatically higher diabetes proportions. E.g., None/K: 14 cases of 19 total (74%), Grades 1–8: 119 of 234 (51%), compared to College grads: 1366 of 4428 (31%). This indicates higher education correlates with lower diabetes prevalence, likely via better health literacy and behaviors.</li>
+        </ul>
+        <p>Balanced classes reveal that socioeconomic factors—both income and education—play a significant role in diabetes prevalence, with lower SES linked to higher risk.</p>
+      </div>
+    </div>
+
+    <!-- Question 4 -->
+    <div id="q4" class="tab-content" style="display:none;">
+      <h2>Question 4</h2>
+      <p><strong>How does physical activity level correlate with the likelihood of developing diabetes?</strong></p>
+
+      <p><em>(Plot generated via <code>GET /api/research/q4</code>)</em></p>
+      <div class="plot-container"><div id="q4-graph"></div></div>
+
+      <div class="interpret">
+        <h3>Interpretation of Physical Activity vs Diabetes (Balanced)</h3>
+        <ul>
+          <li><strong>Physical Activity Counts:</strong> Active individuals have a ~30% diabetes rate (2769/9079) versus ~41% (1659/4025) for inactive—suggesting exercise is protective.</li>
+          <li><strong>BMI Distribution:</strong> Active non‑diabetics median BMI ~26 vs inactive ~28. Across all diabetes statuses, active groups maintain lower median BMIs. Diabetics show the highest medians (~30 active, ~32 inactive). This implies that physical activity’s benefit may be mediated by BMI reduction.</li>
+        </ul>
+        <p>Together, these plots show that regular physical activity is strongly linked to lower diabetes prevalence, likely via its effect on body weight and metabolic health.</p>
+      </div>
+    </div>
+
+    <!-- Question 5 -->
+    <div id="q5" class="tab-content" style="display:none;">
+      <h2>Question 5</h2>
+      <p><strong>What is the relationship between diabetes and other health conditions (heart disease, stroke)?</strong></p>
+
+      <p><em>(Plot generated via <code>GET /api/research/q5</code>)</em></p>
+      <div class="plot-container"><div id="q5-graph"></div></div>
+
+      <div class="interpret">
+        <h3>Interpretation of Diabetes vs Other Health Conditions (Balanced)</h3>
+        <ul>
+          <li><strong>Heart Disease:</strong> Among those with heart disease, 52% have diabetes (1044/2026) vs 31% (3294/10988) without. Indicates strong overlap of cardiovascular and metabolic risk factors.</li>
+          <li><strong>Stroke:</strong> Stroke survivors show 50% diabetes prevalence (419/831) vs 32% (3919/12183) in non‑stroke—highlighting vascular–diabetes interplay.</li>
+        </ul>
+        <p>Balanced classes reveal that both heart disease and stroke are heavily intertwined with diabetes, underscoring shared pathophysiology and the need for integrated care.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // tab switching
+    document.querySelectorAll('.tab-bar button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-bar button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        let tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(tc=>{
+          tc.style.display = (tc.id===tab ? 'block' : 'none');
+        });
+      });
+    });
+
+    // fetch & render each question's Plotly graph
+    ['q2','q3','q4','q5'].forEach(q=>{
+      fetch(`/api/research/${q}`)
+        .then(r=>r.json())
+        .then(({plot_json})=>{
+          let fig = JSON.parse(plot_json),
+              gd  = document.getElementById(`${q}-graph`);
+          Plotly.newPlot(gd, fig.data, fig.layout, {responsive:true});
+        });
+    });
+  </script>
+
+</body>
+</html>

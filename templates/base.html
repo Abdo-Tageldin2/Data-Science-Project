@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Diabetes App</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="sidebar">
+    <h2>🩺 Menu</h2>
+    <a href="{{ url_for('predict') }}">Predict</a>
+    <a href="{{ url_for('graphs') }}">Graphs</a>
+  </div>
+  <div class="main">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
