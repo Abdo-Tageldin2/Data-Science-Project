@@ -1,7 +1,6 @@
 import os
 from flask import Flask, request, render_template, jsonify
 import joblib, pandas as pd
-import requests
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -10,44 +9,37 @@ import gdown
 
 app = Flask(__name__)
 
-# ─── Helper to download the model from Google Drive ──────────────────────────────
+# ─── Parameters for model download ─────────────────────────────────────────────
 MODEL_URL  = "https://drive.google.com/uc?export=download&id=13RbQQ1oVvOHk_dzeGt8uvqJLL_zr69lJ"
 MODEL_PATH = "model1_compressed.pkl"
 
 def download_model():
-    """Download the model file using gdown."""
+    """Attempt to download the model from Google Drive. Log failures, but don’t raise."""
     if os.path.exists(MODEL_PATH):
         print(f"Model file '{MODEL_PATH}' already exists. Skipping download.")
-        return True
-
+        return
     print("Downloading model...")
     out = gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
     if not out or not os.path.exists(MODEL_PATH):
         print(f"❌ Download failed — file '{MODEL_PATH}' not found on disk.")
-        return False
+    else:
+        print(f"✅ Model downloaded successfully to '{MODEL_PATH}'.")
 
-    print(f"✅ Model downloaded successfully to '{MODEL_PATH}'.")
-    return True
+# Try downloading at startup
+download_model()
 
-# ─── Download the model at startup (and fail fast if it doesn’t work) ──────────
-if not download_model():
-    raise RuntimeError(f"❌ Could not download model file '{MODEL_PATH}' from Google Drive.")
-
-# ─── Load the model ─────────────────────────────────────────────────────────────
+# Try loading the model; if it fails, keep model=None
 try:
     model = joblib.load(MODEL_PATH)
     print(f"✅ Loaded model from '{MODEL_PATH}'.")
-except FileNotFoundError as e:
-    print(f"❌ Error loading model file '{MODEL_PATH}': {e}")
-    raise
 except Exception as e:
-    print(f"❌ Unexpected error loading model '{MODEL_PATH}': {e}")
-    raise
+    model = None
+    print(f"❌ Could not load model from '{MODEL_PATH}': {e}")
 
-# ─── Load raw data for visualizations ──────────────────────────────────────────
-df_plot = pd.read_csv("data.csv")  # your cleaned CSV
+# ─── Load data for visualizations ─────────────────────────────────────────────
+df_plot = pd.read_csv("data.csv")
 
-# ─── Prediction form fields & feature order ───────────────────────────────────
+# ─── Prediction form definition ───────────────────────────────────────────────
 fields = [
     {"name":"HighBP","label":"High Blood Pressure","type":"radio",
         "options":[{"value":0,"label":"No"},{"value":1,"label":"Yes"}]},
@@ -114,78 +106,56 @@ fields = [
 ]
 FEATURE_ORDER = [f["name"] for f in fields]
 
-# ─── Full dataset schema for the table ────────────────────────────────
+# ─── Schema for visualizations table ──────────────────────────────────────────
 schema = [
     {"name":"Diabetes_012","dtype":"Categorical",
-     "description":"Diabetes status (0 = No, 1 = Pre-diabetes, 2 = Diabetes).",
-     "potential":"Target variable for predictive modeling."},
+     "description":"Diabetes status (0=No,1=Pre,2=Diabetes).","potential":"Target variable."},
     {"name":"HighBP","dtype":"Binary",
-     "description":"High blood pressure (0 = No, 1 = Yes).",
-     "potential":"Diabetes–hypertension comorbidity."},
+     "description":"High blood pressure (0=No,1=Yes).","potential":"Comorbidity."},
     {"name":"HighChol","dtype":"Binary",
-     "description":"High cholesterol (0 = No, 1 = Yes).",
-     "potential":"Evaluating cholesterol impact."},
+     "description":"High cholesterol (0=No,1=Yes).","potential":"Risk factor."},
     {"name":"CholCheck","dtype":"Binary",
-     "description":"Cholesterol checked in past 5 years (0 = No, 1 = Yes).",
-     "potential":"Preventative care analysis."},
+     "description":"Cholesterol checked (0=No,1=Yes).","potential":"Preventive care."},
     {"name":"BMI","dtype":"Numeric",
-     "description":"Body Mass Index (range ~12–98).",
-     "potential":"Obesity–diabetes correlation."},
+     "description":"Body Mass Index.","potential":"Obesity correlation."},
     {"name":"Smoker","dtype":"Binary",
-     "description":"Smoked ≥100 cigarettes lifetime (0 = No, 1 = Yes).",
-     "potential":"Smoking risk factor."},
+     "description":"Smoker (0=No,1=Yes).","potential":"Lifestyle risk."},
     {"name":"Stroke","dtype":"Binary",
-     "description":"Ever had stroke (0 = No, 1 = Yes).",
-     "potential":"Stroke–diabetes linkage."},
+     "description":"Stroke history (0=No,1=Yes).","potential":"Comorbidity."},
     {"name":"HeartDiseaseorAttack","dtype":"Binary",
-     "description":"History of CHD/MI (0 = No, 1 = Yes).",
-     "potential":"Cardiovascular comorbidity analysis."},
+     "description":"Heart disease history (0=No,1=Yes).","potential":"Comorbidity."},
     {"name":"PhysActivity","dtype":"Binary",
-     "description":"Physical activity past month (0 = No, 1 = Yes).",
-     "potential":"Exercise impact on diabetes."},
+     "description":"Physical activity (0=No,1=Yes).","potential":"Lifestyle factor."},
     {"name":"Fruits","dtype":"Binary",
-     "description":"Consumes fruits daily (0 = No, 1 = Yes).",
-     "potential":"Dietary factor analysis."},
+     "description":"Fruit intake (0=No,1=Yes).","potential":"Dietary factor."},
     {"name":"Veggies","dtype":"Binary",
-     "description":"Consumes vegetables daily (0 = No, 1 = Yes).",
-     "potential":"Dietary factor analysis."},
+     "description":"Vegetable intake (0=No,1=Yes).","potential":"Dietary factor."},
     {"name":"HvyAlcoholConsump","dtype":"Binary",
-     "description":"Heavy drinking (M>14,F>7 per week).",
-     "potential":"Alcohol consumption risk."},
+     "description":"Heavy alcohol use (0=No,1=Yes).","potential":"Lifestyle factor."},
     {"name":"AnyHealthcare","dtype":"Binary",
-     "description":"Has any healthcare coverage (0 = No, 1 = Yes).",
-     "potential":"Access to care analysis."},
+     "description":"Healthcare coverage (0=No,1=Yes).","potential":"Access to care."},
     {"name":"NoDocbcCost","dtype":"Binary",
-     "description":"Skipped doctor due to cost (0 = No, 1 = Yes).",
-     "potential":"Economic barrier analysis."},
+     "description":"Skipped doctor due to cost (0=No,1=Yes).","potential":"Economic barrier."},
     {"name":"GenHlth","dtype":"Categorical",
-     "description":"Self-reported general health (1 = Excellent … 5 = Poor).",
-     "potential":"Health perception analysis."},
+     "description":"General health (1=Excellent…5=Poor).","potential":"Self-report health."},
     {"name":"MentHlth","dtype":"Numeric",
-     "description":"Days poor mental health in past 30 days (0–30).",
-     "potential":"Mental health impact."},
+     "description":"Days poor mental health (0–30).","potential":"Psychological factor."},
     {"name":"PhysHlth","dtype":"Numeric",
-     "description":"Days poor physical health in past 30 days (0–30).",
-     "potential":"Physical health impact."},
+     "description":"Days poor physical health (0–30).","potential":"Physical factor."},
     {"name":"DiffWalk","dtype":"Binary",
-     "description":"Difficulty walking (0 = No, 1 = Yes).",
-     "potential":"Mobility issues analysis."},
+     "description":"Difficulty walking (0=No,1=Yes).","potential":"Mobility issue."},
     {"name":"Sex","dtype":"Binary",
-     "description":"Gender (0 = Female, 1 = Male).",
-     "potential":"Demographic breakdown."},
+     "description":"Gender (0=Female,1=Male).","potential":"Demographic."},
     {"name":"Age","dtype":"Categorical",
-     "description":"Age group (1 = 18–24 … 13 = 80+).",
-     "potential":"Age-adjusted prevalence."},
+     "description":"Age category.","potential":"Demographic."},
     {"name":"Education","dtype":"Categorical",
-     "description":"Education level (1 = None … 6 = College graduate).",
-     "potential":"Education vs. diabetes risk."},
+     "description":"Education level.","potential":"Socioeconomic."},
     {"name":"Income","dtype":"Categorical",
-     "description":"Income category (1 = < $10k … 8 = ≥ $75k).",
-     "potential":"Socioeconomic disparities analysis."}
+     "description":"Income category.","potential":"Socioeconomic."}
 ]
 
-# ─── Helper to get a balanced, undersampled DataFrame ────────────────
 def get_balanced_df():
+    """Return an undersampled, balanced DataFrame for research charts."""
     df = df_plot.copy()
     X = df.drop(columns=['Diabetes_012'])
     y = df['Diabetes_012']
@@ -195,7 +165,7 @@ def get_balanced_df():
     df_bal['Diabetes_012'] = y_us
     return df_bal
 
-# ─── Main pages ───────────────────────────────────────────────────────
+# ─── Flask routes ────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html", fields=fields)
@@ -208,21 +178,25 @@ def visualizations():
 def research():
     return render_template("research.html")
 
-# ─── API endpoints ───────────────────────────────────────────────────
 @app.route("/api/predict", methods=["POST"])
 def api_predict():
+    if model is None:
+        return jsonify(prediction_text=f"❌ Model not loaded ('{MODEL_PATH}')"), 500
+
     data = {}
     for f in fields:
-        raw = request.form[f["name"]]
+        raw = request.form.get(f["name"])
+        if raw is None:
+            return jsonify(prediction_text=f"❌ Missing field {f['name']}"), 400
         data[f["name"]] = float(raw) if f["type"] in ("number","range","select") else int(raw)
+
     df = pd.DataFrame([data], columns=FEATURE_ORDER)
     label_map = {'0':'Non-Diabetic','1':'Pre-Diabetic','2':'Diabetic'}
     try:
         pred = model.predict(df)[0]
-        txt = f"⚡ Prediction: {label_map[str(int(pred))]}"
+        return jsonify(prediction_text=f"⚡ Prediction: {label_map[str(int(pred))]}")
     except Exception as e:
-        txt = f"❌ Model error: {e}"
-    return jsonify(prediction_text=txt)
+        return jsonify(prediction_text=f"❌ Model error: {e}"), 500
 
 @app.route("/api/visualizations", methods=["POST"])
 def api_visualizations():
@@ -236,15 +210,12 @@ def api_visualizations():
     else:
         fig = px.histogram(df_plot, x=col, nbins=15, title=f"Distribution of {col}", template="plotly_dark")
     fig.update_layout(
-        plot_bgcolor="#1e1e1e",
-        paper_bgcolor="#121212",
-        font_color="#e0e0e0",
-        margin=dict(t=50,b=40,l=40,r=40),
+        plot_bgcolor="#1e1e1e", paper_bgcolor="#121212",
+        font_color="#e0e0e0", margin=dict(t=50,b=40,l=40,r=40),
         width=1000, height=450
     )
     return jsonify(plot_json=fig.to_json())
 
-# ─── Research-Q2 … Q5 endpoints ───────────────────────────────────────
 @app.route("/api/research/q2")
 def api_q2():
     df_bal = get_balanced_df()
@@ -258,8 +229,8 @@ def api_q2():
         for s in grp.columns:
             fig.add_trace(go.Bar(
                 x=grp.index, y=grp[s],
-                marker_color=cmap[s],
-                name=f"D{s}", text=grp[s], textposition='auto'
+                marker_color=cmap[s], name=f"D{s}",
+                text=grp[s], textposition='auto'
             ), row=r, col=c)
         fig.update_xaxes(title_text=labels, row=r, col=c)
         fig.update_yaxes(title_text="Count", row=r, col=c)
@@ -286,8 +257,8 @@ def api_q3():
         for s in grp.columns:
             fig.add_trace(go.Bar(
                 x=grp.index, y=grp[s],
-                marker_color=cmap[s],
-                name=f"D{s}", text=grp[s], textposition='auto'
+                marker_color=cmap[s], name=f"D{s}",
+                text=grp[s], textposition='auto'
             ), row=r, col=c)
         fig.update_xaxes(title_text=col, tickvals=grp.index, ticktext=lbls, row=r, col=c)
         fig.update_yaxes(title_text="Count", row=r, col=c)
@@ -307,15 +278,15 @@ def api_q4():
     for s in grp.columns:
         bar.add_trace(go.Bar(
             x=['No','Yes'], y=grp[s].values,
-            marker_color=cmap[s],
-            name=f"D{s}", text=grp[s].values, textposition='auto'
+            marker_color=cmap[s], name=f"D{s}",
+            text=grp[s].values, textposition='auto'
         ))
     bar.update_layout(title="Physical Activity vs Diabetes (Balanced)",
                       template='plotly_dark', barmode='group', height=500, width=800)
     box = px.box(df_bal, x='PhysActivity', y='BMI', color='Diabetes_012',
                  color_discrete_map=cmap,
                  labels={'PhysActivity':'Active?','BMI':'BMI'},
-                 title="BMI Distribution by PhysActivity & Diabetes",
+                 title="BMI Distribution by PhysActivity & Diabetes    ",
                  template='plotly_dark', height=500, width=800)
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Counts","BMI Boxplot"))
     for tr in bar.data: fig.add_trace(tr,1,1)
@@ -336,8 +307,8 @@ def api_q5():
         for s in grp.columns:
             fig.add_trace(go.Bar(
                 x=['No','Yes'], y=grp[s].values,
-                marker_color=cmap[s],
-                name=f"D{s}", text=grp[s].values, textposition='auto'
+                marker_color=cmap[s], name=f"D{s}",
+                text=grp[s].values, textposition='auto'
             ), row=r, col=c)
         fig.update_yaxes(title_text="Count", row=r, col=c)
     bar('HeartDiseaseorAttack',1,1)
