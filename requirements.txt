@@ -8,3 +8,4 @@ imbalanced-learn==0.10.1
 plotly==5.18.0
 requests==2.31.0
 gdown==4.7.1
+huggingface_hub>=0.16
