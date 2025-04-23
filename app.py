@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # ─── Helper to download the model from Google Drive ──────────────────────────────
 MODEL_URL = "https://drive.google.com/uc?export=download&id=13RbQQ1oVvOHk_dzeGt8uvqJLL_zr69lJ"
-MODEL_PATH = "model_compressed.pkl"
+MODEL_PATH = "model1_compressed.pkl"
 
 def download_model():
     """Download the model file using gdown."""
