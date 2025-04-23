@@ -6,14 +6,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from imblearn.under_sampling import RandomUnderSampler
-import os
 import gdown
 
 app = Flask(__name__)
 
 # ─── Helper to download the model from Google Drive ──────────────────────────────
 MODEL_URL = "https://drive.google.com/uc?export=download&id=13RbQQ1oVvOHk_dzeGt8uvqJLL_zr69lJ"
-MODEL_PATH = "model_compressed.pkl"
+MODEL_PATH = "model1_compressed.pkl"
+
 
 def download_model():
     """Download the model file using gdown."""
@@ -30,21 +30,17 @@ def download_model():
         print(f"Error during download: {e}")
         return False
 
-# Download the model at startup
-download_model()
+# ─── Download the model at startup (and fail fast if it doesn’t work) ──────────
+if not download_model():
+    raise RuntimeError("❌ Could not download model from Google Drive.")
 
-# Load the model
-try:
-    model = joblib.load(MODEL_PATH)
-except Exception as e:
-    print(f"Error loading model: {e}")
+# ─── Load the model ─────────────────────────────────────────────────────────────
+model = joblib.load(MODEL_PATH)
 
-
-# ─── Load model & raw data ────────────────────────────────────────────
-#model   = joblib.load("model.pkl")
+# ─── Load raw data for visualizations ──────────────────────────────────────────
 df_plot = pd.read_csv("data.csv")  # your cleaned CSV
 
-# ─── Prediction form fields & feature order ──────────────────────────
+# ─── Prediction form fields & feature order ───────────────────────────────────
 fields = [
     {"name":"HighBP","label":"High Blood Pressure","type":"radio",
         "options":[{"value":0,"label":"No"},{"value":1,"label":"Yes"}]},
@@ -92,11 +88,11 @@ fields = [
     ]},
     {"name":"Education","label":"Education Level","type":"select","options":[
        {"value":1,"label":"Never attended school or only kindergarten"},
-       {"value":2,"label":"Grades 1–8 (Elementary)"},
-       {"value":3,"label":"Grades 9–11 (Some high school)"},
-       {"value":4,"label":"Grade 12 or GED (High school graduate)"},
-       {"value":5,"label":"College 1–3 years (Some college)"},
-       {"value":6,"label":"College 4+ years (College graduate)"}
+       {"value":2,"label":"Grades 1–8 (Elementary)"},
+       {"value":3,"label":"Grades 9–11 (Some high school)"},
+       {"value":4,"label":"Grade 12 or GED (High school graduate)"},
+       {"value":5,"label":"College 1–3 years (Some college)"},
+       {"value":6,"label":"College 4+ years (College graduate)"}
     ]},
     {"name":"Income","label":"Annual Household Income","type":"select","options":[
        {"value":1,"label":"Less than $10,000"},
@@ -114,7 +110,7 @@ FEATURE_ORDER = [f["name"] for f in fields]
 # ─── Full dataset schema for the table ────────────────────────────────
 schema = [
     {"name":"Diabetes_012","dtype":"Categorical",
-     "description":"Diabetes status (0 = No, 1 = Pre‑diabetes, 2 = Diabetes).",
+     "description":"Diabetes status (0 = No, 1 = Pre-diabetes, 2 = Diabetes).",
      "potential":"Target variable for predictive modeling."},
     {"name":"HighBP","dtype":"Binary",
      "description":"High blood pressure (0 = No, 1 = Yes).",
@@ -156,7 +152,7 @@ schema = [
      "description":"Skipped doctor due to cost (0 = No, 1 = Yes).",
      "potential":"Economic barrier analysis."},
     {"name":"GenHlth","dtype":"Categorical",
-     "description":"Self‑reported general health (1 = Excellent … 5 = Poor).",
+     "description":"Self-reported general health (1 = Excellent … 5 = Poor).",
      "potential":"Health perception analysis."},
     {"name":"MentHlth","dtype":"Numeric",
      "description":"Days poor mental health in past 30 days (0–30).",
@@ -172,7 +168,7 @@ schema = [
      "potential":"Demographic breakdown."},
     {"name":"Age","dtype":"Categorical",
      "description":"Age group (1 = 18–24 … 13 = 80+).",
-     "potential":"Age‑adjusted prevalence."},
+     "potential":"Age-adjusted prevalence."},
     {"name":"Education","dtype":"Categorical",
      "description":"Education level (1 = None … 6 = College graduate).",
      "potential":"Education vs. diabetes risk."},
@@ -213,7 +209,7 @@ def api_predict():
         raw = request.form[f["name"]]
         data[f["name"]] = float(raw) if f["type"] in ("number","range","select") else int(raw)
     df = pd.DataFrame([data], columns=FEATURE_ORDER)
-    label_map = {'0':'Non‑Diabetic','1':'Pre‑Diabetic','2':'Diabetic'}
+    label_map = {'0':'Non-Diabetic','1':'Pre-Diabetic','2':'Diabetic'}
     try:
         pred = model.predict(df)[0]
         txt = f"⚡ Prediction: {label_map[str(int(pred))]}"
@@ -241,7 +237,7 @@ def api_visualizations():
     )
     return jsonify(plot_json=fig.to_json())
 
-# ─── Research‑Q2 … Q5 endpoints ───────────────────────────────────────
+# ─── Research-Q2 … Q5 endpoints ───────────────────────────────────────
 @app.route("/api/research/q2")
 def api_q2():
     df_bal = get_balanced_df()
@@ -276,8 +272,8 @@ def api_q3():
     fig = make_subplots(rows=1, cols=2,
         subplot_titles=("Income vs Diabetes","Education vs Diabetes"),
         horizontal_spacing=0.12)
-    income_lbl = ['<10k','10‑15k','15‑20k','20‑25k','25‑35k','35‑50k','50‑75k','≥75k']
-    edu_lbl    = ['None/K','1‑8','9‑11','12/GED','Some Coll','College Grad']
+    income_lbl = ['<10k','10-15k','15-20k','20-25k','25-35k','35-50k','50-75k','≥75k']
+    edu_lbl    = ['None/K','1-8','9-11','12/GED','Some Coll','College Grad']
     def bar(col,r,c,lbls):
         grp = df_bal.groupby([col,'Diabetes_012']).size().unstack(fill_value=0)
         for s in grp.columns:
