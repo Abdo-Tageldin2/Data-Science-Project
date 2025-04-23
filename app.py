@@ -1,6 +1,6 @@
 import os
-import pickle
 from flask import Flask, request, render_template, jsonify
+import joblib
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -10,35 +10,22 @@ from huggingface_hub import hf_hub_download
 
 app = Flask(__name__)
 
-# ─── Model loading with local caching ─────────────────────────────────────────
-HF_REPO = "Abdotageldin/diabetes-pkl"
+# ─── Hugging Face model download & load ────────────────────────────────────────
+HF_REPO     = "Abdotageldin/diabetes-pkl"
 HF_FILENAME = "model_compressed.pkl"
-MODEL_CACHE_PATH = os.path.join("/app", "model_compressed.pkl")  # Persistent in Heroku dyno
 
-def load_model():
-    try:
-        # Download and cache model if not already present
-        if not os.path.exists(MODEL_CACHE_PATH):
-            print(f"Downloading model from Hugging Face: {HF_REPO}/{HF_FILENAME}")
-            hf_hub_download(repo_id=HF_REPO, filename=HF_FILENAME, local_dir="/app")
-        print(f"✅ Loading model from '{MODEL_CACHE_PATH}'")
-        with open(MODEL_CACHE_PATH, 'rb') as f:
-            model = pickle.load(f)
-        print("✅ Model loaded successfully")
-        return model
-    except Exception as e:
-        print(f"❌ Could not fetch/load model: {e}")
-        return None
-
-model = load_model()
+try:
+    # Download (and cache) the .pkl from your HF repo
+    MODEL_PATH = hf_hub_download(repo_id=HF_REPO, filename=HF_FILENAME)
+    print(f"✅ Downloaded model to '{MODEL_PATH}'")
+    model = joblib.load(MODEL_PATH)
+    print("✅ Model loaded successfully")
+except Exception as e:
+    model = None
+    print(f"❌ Could not fetch/load model: {e}")
 
 # ─── Load CSV for visualizations ───────────────────────────────────────────────
-try:
-    df_plot = pd.read_csv("data.csv")
-    print("✅ Data CSV loaded successfully")
-except Exception as e:
-    print(f"❌ Could not load data.csv: {e}")
-    df_plot = None
+df_plot = pd.read_csv("data.csv")
 
 # ─── Prediction form fields & feature order ───────────────────────────────────
 fields = [
@@ -107,7 +94,7 @@ fields = [
 ]
 FEATURE_ORDER = [f["name"] for f in fields]
 
-# ─── Schema for the visualizations table ───────────────────────────────────────
+# ─── Schema for the visualizations table ────────────────────────────────────────
 schema = [
     {"name":"Diabetes_012","dtype":"Categorical","description":"Diabetes status (0=No,1=Pre,2=Diabetes).","potential":"Target"},
     {"name":"HighBP","dtype":"Binary","description":"High blood pressure (0=No,1=Yes).","potential":"Comorbidity"},
@@ -134,8 +121,6 @@ schema = [
 ]
 
 def get_balanced_df():
-    if df_plot is None:
-        return None
     df = df_plot.copy()
     X = df.drop(columns=['Diabetes_012'])
     y = df['Diabetes_012']
@@ -162,71 +147,55 @@ def research():
 @app.route("/api/predict", methods=["POST"])
 def api_predict():
     if model is None:
-        return jsonify({"error": "Model not loaded, check server logs for details"}), 500
+        return jsonify(prediction_text="❌ Model not loaded"), 500
 
     data = {}
     for f in fields:
         raw = request.form.get(f["name"])
         if raw is None:
-            return jsonify({"error": f"Missing field: {f['name']}"}), 400
-        try:
-            data[f["name"]] = float(raw) if f["type"] in ("number", "range", "select") else int(raw)
-        except ValueError:
-            return jsonify({"error": f"Invalid value for {f['name']}: {raw}"}), 400
+            return jsonify(prediction_text=f"❌ Missing field {f['name']}"), 400
+        data[f["name"]] = float(raw) if f["type"] in ("number","range","select") else int(raw)
 
+    df = pd.DataFrame([data], columns=FEATURE_ORDER)
+    label_map = {'0':'Non-Diabetic','1':'Pre-Diabetic','2':'Diabetic'}
     try:
-        df = pd.DataFrame([data], columns=FEATURE_ORDER)
-        label_map = {'0': 'Non-Diabetic', '1': 'Pre-Diabetic', '2': 'Diabetic'}
         pred = model.predict(df)[0]
-        return jsonify({"prediction": label_map[str(int(pred))]})
+        return jsonify(prediction_text=f"⚡ Prediction: {label_map[str(int(pred))]}")
     except Exception as e:
-        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+        return jsonify(prediction_text=f"❌ Model error: {e}"), 500
 
 @app.route("/api/visualizations", methods=["POST"])
 def api_visualizations():
-    if df_plot is None:
-        return jsonify({"error": "Data not loaded, check server logs"}), 500
-
-    col = request.form.get("column")
-    if not col or col not in df_plot.columns:
-        return jsonify({"error": f"Invalid or missing column: {col}"}), 400
-
+    col = request.form["column"]
     series = df_plot[col].dropna()
-    try:
-        if not pd.api.types.is_numeric_dtype(series) or series.nunique() <= 10:
-            counts = series.value_counts().sort_index().reset_index()
-            counts.columns = [col, "count"]
-            fig = px.bar(counts, x=col, y="count", title=f"Distribution of {col}", template="plotly_dark")
-            fig.update_xaxes(type="category")
-        else:
-            fig = px.histogram(df_plot, x=col, nbins=15, title=f"Distribution of {col}", template="plotly_dark")
-        fig.update_layout(
-            plot_bgcolor="#1e1e1e",
-            paper_bgcolor="#121212",
-            font_color="#e0e0e0",
-            margin=dict(t=50, b=40, l=40, r=40),
-            width=1000, height=450
-        )
-        return jsonify({"plot_json": fig.to_json()})
-    except Exception as e:
-        return jsonify({"error": f"Visualization failed: {str(e)}"}), 500
+    if not pd.api.types.is_numeric_dtype(series) or series.nunique() <= 10:
+        counts = series.value_counts().sort_index().reset_index()
+        counts.columns = [col, "count"]
+        fig = px.bar(counts, x=col, y="count", title=f"Distribution of {col}", template="plotly_dark")
+        fig.update_xaxes(type="category")
+    else:
+        fig = px.histogram(df_plot, x=col, nbins=15, title=f"Distribution of {col}", template="plotly_dark")
+    fig.update_layout(
+        plot_bgcolor="#1e1e1e",
+        paper_bgcolor="#121212",
+        font_color="#e0e0e0",
+        margin=dict(t=50,b=40,l=40,r=40),
+        width=1000, height=450
+    )
+    return jsonify(plot_json=fig.to_json())
 
 @app.route("/api/research/q2")
 def api_q2():
     df_bal = get_balanced_df()
-    if df_bal is None:
-        return jsonify({"error": "Data not loaded, check server logs"}), 500
-
-    cmap = {0: '#1f77b4', 1: '#ff7f0e', 2: '#d62728'}
+    cmap = {0:'#1f77b4',1:'#ff7f0e',2:'#d62728'}
     fig = make_subplots(
         rows=2, cols=2,
-        subplot_titles=("Smoking vs Diabetes", "Heavy Alcohol vs Diabetes",
-                        "Fruit Intake vs Diabetes", "Veggies vs Diabetes"),
+        subplot_titles=("Smoking vs Diabetes","Heavy Alcohol vs Diabetes",
+                        "Fruit Intake vs Diabetes","Veggies vs Diabetes"),
         vertical_spacing=0.20, horizontal_spacing=0.12
     )
-
     def bar(col, r, c, labels):
-        grp = df_bal.groupby([col, 'Diabetes_012']).size().unstack(fill_value=0)
+        grp = df_bal.groupby([col,'Diabetes_012']).size().unstack(fill_value=0)
         for s in grp.columns:
             fig.add_trace(go.Bar(
                 x=grp.index, y=grp[s],
@@ -236,34 +205,31 @@ def api_q2():
         fig.update_xaxes(title_text=labels, row=r, col=c)
         fig.update_yaxes(title_text="Count", row=r, col=c)
 
-    bar('Smoker', 1, 1, 'No/Yes')
-    bar('HvyAlcoholConsump', 1, 2, 'No/Yes')
-    bar('Fruits', 2, 1, '<1/day,≥1/day')
-    bar('Veggies', 2, 2, '<1/day,≥1/day')
+    bar('Smoker',1,1,'No/Yes')
+    bar('HvyAlcoholConsump',1,2,'No/Yes')
+    bar('Fruits',2,1,'<1/day,≥1/day')
+    bar('Veggies',2,2,'<1/day,≥1/day')
 
     fig.update_layout(
         title="Lifestyle Factors vs Diabetes (Balanced)",
         template='plotly_dark', barmode='group',
         height=1000, width=1400
     )
-    return jsonify({"plot_json": fig.to_json()})
+    return jsonify(plot_json=fig.to_json())
 
 @app.route("/api/research/q3")
 def api_q3():
     df_bal = get_balanced_df()
-    if df_bal is None:
-        return jsonify({"error": "Data not loaded, check server logs"}), 500
-
-    cmap = {0: '#1f77b4', 1: '#ff7f0e', 2: '#d62728'}
+    cmap = {0:'#1f77b4',1:'#ff7f0e',2:'#d62728'}
     fig = make_subplots(rows=1, cols=2,
-                        subplot_titles=("Income vs Diabetes", "Education vs Diabetes"),
-                        horizontal_spacing=0.12)
-
-    income_lbl = ['<10k', '10-15k', '15-20k', '20-25k', '25-35k', '35-50k', '50-75k', '≥75k']
-    edu_lbl = ['None/K', '1-8', '9-11', '12/GED', 'Some Coll', 'College Grad']
+        subplot_titles=("Income vs Diabetes","Education vs Diabetes"),
+        horizontal_spacing=0.12
+    )
+    income_lbl = ['<10k','10-15k','15-20k','20-25k','25-35k','35-50k','50-75k','≥75k']
+    edu_lbl    = ['None/K','1-8','9-11','12/GED','Some Coll','College Grad']
 
     def bar(col, r, c, lbls):
-        grp = df_bal.groupby([col, 'Diabetes_012']).size().unstack(fill_value=0)
+        grp = df_bal.groupby([col,'Diabetes_012']).size().unstack(fill_value=0)
         for s in grp.columns:
             fig.add_trace(go.Bar(
                 x=grp.index, y=grp[s],
@@ -273,30 +239,27 @@ def api_q3():
         fig.update_xaxes(title_text=col, tickvals=grp.index, ticktext=lbls, row=r, col=c)
         fig.update_yaxes(title_text="Count", row=r, col=c)
 
-    bar('Income', 1, 1, income_lbl)
-    bar('Education', 1, 2, edu_lbl)
+    bar('Income',1,1,income_lbl)
+    bar('Education',1,2,edu_lbl)
 
     fig.update_layout(
         title="Socioeconomic Factors vs Diabetes (Balanced)",
         template='plotly_dark', barmode='group',
         height=600, width=1400
     )
-    return jsonify({"plot_json": fig.to_json()})
+    return jsonify(plot_json=fig.to_json())
 
 @app.route("/api/research/q4")
 def api_q4():
     df_bal = get_balanced_df()
-    if df_bal is None:
-        return jsonify({"error": "Data not loaded, check server logs"}), 500
-
-    cmap = {0: '#1f77b4', 1: '#ff7f0e', 2: '#d62728'}
+    cmap = {0:'#1f77b4',1:'#ff7f0e',2:'#d62728'}
 
     # Counts bar
-    grp = df_bal.groupby(['PhysActivity', 'Diabetes_012']).size().unstack(fill_value=0)
+    grp = df_bal.groupby(['PhysActivity','Diabetes_012']).size().unstack(fill_value=0)
     bar_fig = go.Figure()
     for s in grp.columns:
         bar_fig.add_trace(go.Bar(
-            x=['No', 'Yes'], y=grp[s].values,
+            x=['No','Yes'], y=grp[s].values,
             marker_color=cmap[s],
             name=f"D{s}", text=grp[s].values, textposition='auto'
         ))
@@ -310,51 +273,49 @@ def api_q4():
     box_fig = px.box(
         df_bal, x='PhysActivity', y='BMI', color='Diabetes_012',
         color_discrete_map=cmap,
-        labels={'PhysActivity': 'Active?', 'BMI': 'BMI'},
+        labels={'PhysActivity':'Active?','BMI':'BMI'},
         title="BMI Distribution by PhysActivity & Diabetes",
         template='plotly_dark', height=500, width=800
     )
 
     # Combine
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Counts", "BMI Boxplot"))
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Counts","BMI Boxplot"))
     for tr in bar_fig.data:
         fig.add_trace(tr, row=1, col=1)
     for tr in box_fig.data:
         fig.add_trace(tr, row=1, col=2)
 
     fig.update_layout(template='plotly_dark', barmode='group', height=550, width=1400)
-    return jsonify({"plot_json": fig.to_json()})
+    return jsonify(plot_json=fig.to_json())
 
 @app.route("/api/research/q5")
 def api_q5():
     df_bal = get_balanced_df()
-    if df_bal is None:
-        return jsonify({"error": "Data not loaded, check server logs"}), 500
-
-    cmap = {0: '#1f77b4', 1: '#ff7f0e', 2: '#d62728'}
+    cmap = {0:'#1f77b4',1:'#ff7f0e',2:'#d62728'}
     fig = make_subplots(rows=1, cols=2,
-                        subplot_titles=("Heart Disease vs Diabetes", "Stroke vs Diabetes"),
-                        horizontal_spacing=0.12)
+        subplot_titles=("Heart Disease vs Diabetes","Stroke vs Diabetes"),
+        horizontal_spacing=0.12
+    )
 
     def bar(col, r, c):
-        grp = df_bal.groupby([col, 'Diabetes_012']).size().unstack(fill_value=0)
+        grp = df_bal.groupby([col,'Diabetes_012']).size().unstack(fill_value=0)
         for s in grp.columns:
             fig.add_trace(go.Bar(
-                x=['No', 'Yes'], y=grp[s].values,
+                x=['No','Yes'], y=grp[s].values,
                 marker_color=cmap[s],
                 name=f"D{s}", text=grp[s].values, textposition='auto'
             ), row=r, col=c)
         fig.update_yaxes(title_text="Count", row=r, col=c)
 
-    bar('HeartDiseaseorAttack', 1, 1)
-    bar('Stroke', 1, 2)
+    bar('HeartDiseaseorAttack',1,1)
+    bar('Stroke',1,2)
 
     fig.update_layout(
         title="Diabetes vs Other Conditions (Balanced)",
         template='plotly_dark', barmode='group',
         height=600, width=1400
     )
-    return jsonify({"plot_json": fig.to_json()})
+    return jsonify(plot_json=fig.to_json())
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
