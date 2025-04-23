@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualizations</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    .schema-table { width:100%; border-collapse:collapse; margin-bottom:1rem; }
+    .schema-table th, .schema-table td { border:1px solid #333; padding:0.6rem; }
+    .schema-table th { background:#2a2a2a; }
+    .plot-container { margin-top:1.5rem; }
+    .observations { background:#232323; padding:1rem; border-radius:6px; margin:1.5rem 0; line-height:1.5; }
+    .observations h2 { margin-top:0; }
+    .observations ul { margin-top:0.5rem; padding-left:1.2rem; }
+  </style>
+</head>
+<body>
+  <div class="top-nav">
+    <a href="/">🔮 Predict</a> |
+    <a href="/visualizations">📈 Visualizations</a> |
+    <a href="/research">🔬 Research & Observations</a>
+  </div>
+  <div class="container">
+    <h1>📈 Visualizations</h1>
+    <h2>Dataset Schema</h2>
+    <div class="table-container">
+      <table class="schema-table">
+        <thead>
+          <tr><th>Column Name</th><th>Data Type</th><th>Description</th><th>Potential Use in Analysis</th></tr>
+        </thead>
+        <tbody>
+          {% for col in schema %}
+          <tr>
+            <td><strong>{{col.name}}</strong></td>
+            <td>{{col.dtype}}</td>
+            <td>{{col.description}}</td>
+            <td>{{col.potential}}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form id="viz-form" style="text-align:center; margin-bottom:2rem;">
+      <label>Select a column to plot:</label>
+      <select name="column" required>
+        <option value="" disabled selected>-- pick one --</option>
+        {% for col in schema %}
+        <option value="{{col.name}}">{{col.name}}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="predict-button">Show Distribution</button>
+    </form>
+    <div id="plot-container" class="plot-container"></div>
+    <div id="observations" class="observations" style="display:none;">
+      <h2>Dataset Observations</h2>
+      <p><strong>Class Imbalances</strong>: Many target variables (e.g., <code>Stroke</code>, <code>HeartDiseaseorAttack</code>, <code>Diabetes_012</code>) exhibit significant class imbalance, which may impact predictive modeling and require careful handling during training.</p>
+      <p><strong>Evenly Distributed Features</strong>: Variables like <code>Sex</code>, <code>Smoker</code>, <code>HighBP</code>, and <code>HighChol</code> show a more balanced distribution, enhancing feature diversity.</p>
+      <p><strong>Lifestyle Patterns</strong>: Variables such as <code>PhysActivity</code>, <code>Fruits</code>, <code>Veggies</code>, and <code>HvyAlcoholConsump</code> indicate respondents generally report healthier behaviors.</p>
+      <h3>Distribution of Diabetes_012</h3>
+      <ul>
+        <li><strong>Category 0</strong>: Majority (~220,000+ samples) do not have diabetes.</li>
+        <li><strong>Category 1</strong>: Pre‑diabetes (~100,000 samples).</li>
+        <li><strong>Category 2</strong>: Diabetes (~100,000 samples).</li>
+        <li><strong>Observation</strong>: Class imbalance indicates need for SMOTE or class weights in modeling.</li>
+      </ul>
+    </div>
+  </div>
+  <script>
+    document.getElementById("viz-form").addEventListener("submit",async e=>{
+      e.preventDefault();
+      const figJson = (await (await fetch("/api/visualizations",{method:"POST",body:new FormData(e.target)})).json()).plot_json;
+      const fig = JSON.parse(figJson);
+      document.getElementById("plot-container").innerHTML = "<div id='graph'></div>";
+      Plotly.newPlot("graph",fig.data,fig.layout,{responsive:true});
+      document.getElementById("observations").style.display="block";
+    });
+  </script>
+</body>
+</html>
