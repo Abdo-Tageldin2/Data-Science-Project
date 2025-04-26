@@ -50,15 +50,44 @@
       </div>
       <button type="submit" class="predict-button">Submit</button>
     </form>
-    <div id="prediction-output" class="prediction-output" style="display:none;"></div>
+    <div id="prediction-output" class="prediction-output" style="display:none;">
+      <h3>Prediction Result</h3>
+      <p><strong>Status:</strong> <span id="prediction-text"></span></p>
+      <p><strong>Probability:</strong> <span id="confidence-text"></span></p>
+      <p><strong>Risk Level:</strong> <span id="risk-level"></span></p>
+      <p><strong>Recommendation:</strong> <span id="recommendation-text"></span></p>
+    </div>
   </div>
   <script>
-    document.getElementById("predict-form").addEventListener("submit",async e=>{
+    document.getElementById("predict-form").addEventListener("submit", async e => {
       e.preventDefault();
-      const res=await fetch("/api/predict",{method:"POST",body:new FormData(e.target)});
-      const {prediction_text}=await res.json();
-      const out=document.getElementById("prediction-output");
-      out.textContent=prediction_text; out.style.display="block";
+      const outputDiv = document.getElementById("prediction-output");
+      
+      try {
+        const formData = new FormData(e.target);
+        const response = await fetch("/api/predict", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+
+        const data = await response.json();
+        
+        // Update the output elements
+        document.getElementById("prediction-text").textContent = data.prediction;
+        document.getElementById("confidence-text").textContent = data.confidence;
+        document.getElementById("risk-level").textContent = data.risk_level;
+        document.getElementById("recommendation-text").textContent = data.recommendation;
+        
+        // Show the output
+        outputDiv.style.display = "block";
+      } catch (error) {
+        outputDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        outputDiv.style.display = "block";
+      }
     });
   </script>
 </body>

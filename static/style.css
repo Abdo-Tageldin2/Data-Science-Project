@@ -145,3 +145,42 @@ input[type="range"] {
   color: #00e676;
   font-size: 1.2rem;
 }
+/* Add these to your existing style.css */
+
+.prediction-output h3 {
+  color: #1db954;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.5rem;
+}
+
+.prediction-output p {
+  margin: 0.8rem 0;
+  text-align: left;
+}
+
+.prediction-output strong {
+  color: #e0e0e0;
+}
+
+.prediction-output span {
+  color: #00e676;
+}
+
+.error {
+  color: #ff5252;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .prediction-output {
+    padding: 0.8rem;
+    font-size: 1rem;
+  }
+}
